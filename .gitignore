@@ -1,0 +1,4 @@
+# Visual Studio
+/src/.vs
+/src/output/
+/src/**/*.user

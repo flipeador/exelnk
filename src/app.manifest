@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly
+  manifestVersion="1.0"
+  xmlns="urn:schemas-microsoft-com:asm.v1"
+  xmlns:asm2="urn:schemas-microsoft-com:asm.v2"
+  xmlns:asm3="urn:schemas-microsoft-com:asm.v3"
+  xmlns:com1="urn:schemas-microsoft-com:compatibility.v1">
+
+  <assemblyIdentity version="1.0.0.0" name="Flipeador.AppWrapper"/>
+
+  <com1:compatibility>
+    <application>
+      <!-- W10 | W11 | WS2016 | WS2019 | WS2022 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </com1:compatibility>
+
+  <asm2:trustInfo>
+    <asm2:security>
+      <asm2:requestedPrivileges>
+        <asm2:requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </asm2:requestedPrivileges>
+    </asm2:security>
+  </asm2:trustInfo>
+
+  <asm3:application>
+    <asm3:windowsSettings
+      xmlns:y11="http://schemas.microsoft.com/SMI/2011/WindowsSettings"
+      xmlns:y16="http://schemas.microsoft.com/SMI/2016/WindowsSettings"
+      xmlns:y19="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+      <y11:disableWindowFiltering>true</y11:disableWindowFiltering>
+      <y16:dpiAwareness>PerMonitorV2</y16:dpiAwareness>
+      <y16:longPathAware>true</y16:longPathAware>
+      <y19:activeCodePage>UTF-8</y19:activeCodePage>
+    </asm3:windowsSettings>
+  </asm3:application>
+
+</assembly>
