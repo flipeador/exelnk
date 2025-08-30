@@ -6,7 +6,7 @@
   xmlns:asm3="urn:schemas-microsoft-com:asm.v3"
   xmlns:com1="urn:schemas-microsoft-com:compatibility.v1">
 
-  <assemblyIdentity version="1.0.0.0" name="Flipeador.AppWrapper"/>
+  <assemblyIdentity version="1.0.2.0" name="Flipeador.ExeLnk"/>
 
   <com1:compatibility>
     <application>
