@@ -28,18 +28,29 @@ static auto WriteAds(StrView path, StrView name, StrView text)
 
 INT wmain(INT argc, PWSTR argv[])
 {
-    auto consoleProcessCount = CheckConsoleWindow();
+    DWORD consoleProcessList; // https://stackoverflow.com/a/64842606/14822191
+    auto isFinalProcess = GetConsoleProcessList(&consoleProcessList, 1) < 2;
+
+    if (isFinalProcess)
+        ShowWindow(GetConsoleWindow(), SW_HIDE);
 
     std::vector<String> args;
     for (INT i = 1; i < argc; ++i)
         args.push_back(argv[i]);
 
-    auto path = GetModuleFileName(nullptr);
+    auto path = GetModulePath(nullptr);
 
     // Write alternate data stream (ADS).
-    if (args.size() >= 3 && args[0] == L":SET:")
+    if (args.size() && args[0] == L":SET:")
     {
-        CHECK_ERROR(WriteAds(path, args[1], args[2]));
+        if (args.size() >= 3)
+        {
+            CHECK_ERROR(WriteAds(path, args[1], args[2]));
+        }
+        else
+        {
+            PRINT(L"Usage:\n\texelnk.exe :SET: <name> <value>");
+        }
         return NO_ERROR;
     }
 
@@ -70,13 +81,18 @@ INT wmain(INT argc, PWSTR argv[])
     for (const auto& arg : args)
         AppendArgument(cmdl, arg, BITALL(flags, EXELNK_FLAGS_RAW));
 
+    DWORD creationFlags = 0;
+
+    if (isFinalProcess)
+        creationFlags |= CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP;
+
     PROCESS_INFORMATION pi { };
     STARTUPINFOW si { .cb = sizeof(STARTUPINFOW), .dwFlags = STARTF_USESHOWWINDOW, .wShowWindow = scmd };
-    CHECK_ERROR(CreateProcessW(file.data(), cmdl.data(), nullptr, nullptr, FALSE, 0, nullptr, pcwd, &si, &pi));
-    
+    CHECK_ERROR(CreateProcessW(file.data(), cmdl.data(), nullptr, nullptr, FALSE, creationFlags, nullptr, pcwd, &si, &pi));
+
     DWORD exitCode = NO_ERROR;
 
-    if (consoleProcessCount > 1)
+    if (!isFinalProcess)
     {
         WaitForSingleObject(pi.hProcess, INFINITE);
         GetExitCodeProcess(pi.hProcess, &exitCode);
@@ -85,5 +101,5 @@ INT wmain(INT argc, PWSTR argv[])
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
 
-    return PrintSystemError(exitCode);
+    return exitCode;
 }

@@ -11,8 +11,6 @@
 
 #define LONG_MAXPATH UNICODE_STRING_MAX_CHARS // 32767
 
-#undef GetModuleFileName
-
 /***************************************************
  * STD LIBRARY
 ***************************************************/

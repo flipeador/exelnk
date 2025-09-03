@@ -1,8 +1,8 @@
 #include "framework.hpp"
 
-File::File(StrView fileName, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition, DWORD flagsAndAttributes)
+File::File(StrView path, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition, DWORD flagsAndAttributes)
 {
-    m_hFile = CreateFileW(fileName.data(), desiredAccess, shareMode, nullptr, creationDisposition, flagsAndAttributes, nullptr);
+    m_hFile = CreateFileW(path.data(), desiredAccess, shareMode, nullptr, creationDisposition, flagsAndAttributes, nullptr);
 }
 
 File::~File()
@@ -10,7 +10,7 @@ File::~File()
     CloseHandle(m_hFile);
 }
 
-std::optional<size_t> File::Size()
+std::optional<size_t> File::Size() const
 {
     LARGE_INTEGER size;
     if (GetFileSizeEx(m_hFile, &size))
@@ -18,7 +18,7 @@ std::optional<size_t> File::Size()
     return std::nullopt;
 }
 
-std::optional<size_t> File::Read(void* ptr, size_t bytes)
+std::optional<size_t> File::Read(void* ptr, size_t bytes) const
 {
     DWORD bytesRead;
     if (ReadFile(m_hFile, ptr, (DWORD)bytes, &bytesRead, nullptr))
@@ -26,7 +26,7 @@ std::optional<size_t> File::Read(void* ptr, size_t bytes)
     return std::nullopt;
 }
 
-std::optional<size_t> File::Write(const void* ptr, size_t bytes)
+std::optional<size_t> File::Write(const void* ptr, size_t bytes) const
 {
     DWORD bytesWritten;
     if (WriteFile(m_hFile, ptr, (DWORD)bytes, &bytesWritten, nullptr))
@@ -34,7 +34,7 @@ std::optional<size_t> File::Write(const void* ptr, size_t bytes)
     return std::nullopt;
 }
 
-File::operator bool()
+File::operator bool() const
 {
     return m_hFile != INVALID_HANDLE_VALUE;
 }
@@ -61,21 +61,12 @@ std::optional<size_t> File::WriteText(StrView path, StrView text)
     return std::nullopt;
 }
 
-std::optional<int64_t> StrToInt(StrView str, int base)
+std::optional<int64_t> StrToInt(StrView str, INT base)
 {
     wchar_t* end;
     auto i = std::wcstoll(str.data(), &end, base);
     if (str.data() == end) return std::nullopt;
     return i;
-}
-
-DWORD CheckConsoleWindow()
-{
-    DWORD list;
-    auto count = GetConsoleProcessList(&list, 1);
-    if (count < 2)
-        ShowWindow(GetConsoleWindow(), SW_HIDE);
-    return count;
 }
 
 // https://learn.microsoft.com/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
@@ -128,7 +119,7 @@ String SystemErrorToString(DWORD error)
     return message;
 }
 
-String GetModuleFileName(HMODULE hModule)
+String GetModulePath(HMODULE hModule)
 {
     String str;
     str.resize_and_overwrite(LONG_MAXPATH,
