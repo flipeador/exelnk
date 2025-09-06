@@ -1,6 +1,9 @@
 # ExeLnk
 
-Use an `exe` file as a shortcut file, similar to [Shell links][isl].
+Use an `exe` file as a shortcut file or app execution alias:
+- Serves as a lightweight intermediary to run executables seamlessly.
+- Manages program dependencies and dynamic DLL loading correctly.
+- Simplifies environment setup by preventing uncontrolled `PATH` growth.
 
 ```bash
 exelnk.exe :SET: file  <path>  # set target file
