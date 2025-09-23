@@ -33,13 +33,13 @@
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Debug'">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Release'">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -212,12 +212,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="lib\file.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="util.cpp" />
+    <ClCompile Include="lib\path.cpp" />
+    <ClCompile Include="lib\util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.hpp" />
-    <ClInclude Include="util.hpp" />
+    <ClInclude Include="lib\file.hpp" />
+    <ClInclude Include="lib\path.hpp" />
+    <ClInclude Include="lib\util.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />

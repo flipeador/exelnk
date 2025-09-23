@@ -7,24 +7,37 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 
-#include <windows.h>
+#include <Windows.h>
 
-#define LONG_MAXPATH UNICODE_STRING_MAX_CHARS // 32767
+#undef GetCurrentDirectory
+#undef SetCurrentDirectory
+#undef GetEnvironmentVariable
+#undef SetEnvironmentVariable
 
 /***************************************************
  * STD LIBRARY
 ***************************************************/
 
-#include <optional>
+#include <format>
+#include <vector>
+#include <string>
+#include <string_view>
 #include <iostream>
-#include <filesystem>
+#include <optional>
+#include <algorithm>
+#include <functional>
 
 using String = std::wstring;
 using StrView = std::wstring_view;
-using Path = std::filesystem::path;
+
+template <typename T> using Vector = std::vector<T>;
+template <typename T> using Optional = std::optional<T>;
+template <typename T> using Function = std::function<T>;
 
 /***************************************************
  * PROJECT
 ***************************************************/
 
-#include "util.hpp"
+#include "lib/path.hpp"
+#include "lib/file.hpp"
+#include "lib/util.hpp"

@@ -3,7 +3,12 @@
 Use an `exe` file as a shortcut file or app execution alias:
 - Serves as a lightweight intermediary to run executables seamlessly.
 - Manages program dependencies and dynamic DLL loading correctly.
-- Simplifies environment setup by preventing uncontrolled `PATH` growth.
+- Simplifies [environment][env] setup by preventing uncontrolled `PATH` growth.
+- Resolves [wildcards](#wildcard-patterns) with [FindFirstFileEx][fff] recursively for each path segment.
+
+## Usage
+
+### Configuration
 
 ```bash
 exelnk.exe :SET: file  <path>  # set target file
@@ -13,20 +18,84 @@ exelnk.exe :SET: scmd  <scmd>  # 1=normal | 2=min | 3=max
 exelnk.exe :SET: flags <flags> # 0 | 1=:RAW:
 ```
 
+Use wildcards to link to files with version numbers in the path:
+
 ```bash
-exelnk.exe [...args] # execute the target file
+# Example with an app that contains the version number in the path.
+exelnk.exe :SET: file "C:\Program Files\Python\3.*\python.exe"
 ```
 
-Use `:RAW:` to disable argument parsing, useful with [`cmd.exe`][cmd]:
+### Execution
+
+Execute the target file:
+
+```bash
+exelnk.exe [...args]
+```
+
+Use `:RAW:` to disable argument parsing (useful with [CMD][cmd]):
 
 ```bash
 exelnk.exe :RAW: [...args]
 ```
 
+## Wildcard Patterns
+
+You can use the following path [wildcards][nie]:
+
+| Character | Description |
+| :---: | --- |
+| `?` | Matches a single character. |
+| `*` | Matches zero or more characters. |
+
+<details>
+<summary><h3>How it works</h4></summary>
+
+Performs a recursive depth-first search to resolve wildcard patterns in the path.
+
+At each path segment, it enumerates matching directories or files:
+- Substitutes the current segment with the candidate name, and recurses into the next level.
+- If the target path does not exist at some depth, the function backtracks and continues with the next candidate from the previous level.
+- The search terminates as soon as a full valid path is found, or exhausts all options if none exists.
+
+For example, given the pattern `C:\XYZ_*\File.txt` and the following file structure:
+
+```
+C:\
+ ├─ XYZ_a\
+ ├─ XYZ_b\
+ │  └─ File.txt
+ └─ XYZ_c\
+    └─ File.txt
+```
+
+The algorithm behaves as follows:
+
+1. `C:\XYZ_a\` found → `File.txt` not found → backtrack.
+2. `C:\XYZ_b\` found → `File.txt` found → stop (full path resolved).
+
+</details>
+
 ## Download
 
 <https://github.com/flipeador/exelnk/releases>
 
+## Build
+
+Install [Visual Studio][vs] 2026; add the workloads and components required for developing with C++.
+
+[Download][downl] or [clone][clone] this repository to your local computer, open [`exelnk.slnx`](src/exelnk.slnx) with Visual Studio.
+
+Select the **Release** configuration, right click the `exelnk` project and **Build** it.
+
 <!-- Reference Links -->
+[vs]: https://visualstudio.microsoft.com
+
+[env]: https://github.com/flipeador/environment-variables-editor
+[fff]: https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw
 [isl]: https://learn.microsoft.com/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinkw
+[nie]: https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/nf-ntifs-_fsrtl_advanced_fcb_header-fsrtlisnameinexpression
 [cmd]: https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way#:~:text=cmd.exe
+
+[downl]: https://github.com/flipeador/exelnk/archive/refs/heads/main.zip
+[clone]: https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository

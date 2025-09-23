@@ -13,15 +13,27 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\lib">
+      <UniqueIdentifier>{9b83581f-cfa0-489d-8712-752b2f3e7d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lib">
+      <UniqueIdentifier>{b00df780-bce0-4398-9fe0-25de34dfa388}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="lib\path.cpp">
+      <Filter>Source Files\lib</Filter>
     </ClCompile>
-    <ClCompile Include="util.cpp">
+    <ClCompile Include="lib\util.cpp">
+      <Filter>Source Files\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\file.cpp">
+      <Filter>Source Files\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,8 +41,14 @@
     <ClInclude Include="framework.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="util.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="lib\path.hpp">
+      <Filter>Header Files\lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\util.hpp">
+      <Filter>Header Files\lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\file.hpp">
+      <Filter>Header Files\lib</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
