@@ -12,7 +12,7 @@ Use an `exe` file as a shortcut file or app execution alias:
 
 ```bash
 exelnk.exe :SET: file  <path>  # set target file
-exelnk.exe :SET: args  <path>  # set command line
+exelnk.exe :SET: args  <cmdl>  # set command line
 exelnk.exe :SET: wdir  <path>  # set working directory
 exelnk.exe :SET: scmd  <scmd>  # 1=normal | 2=min | 3=max
 exelnk.exe :SET: flags <flags> # 0 | 1=:RAW:
@@ -33,6 +33,18 @@ Execute the target file:
 exelnk.exe [...args]
 ```
 
+Use `:FIND:` to resolve a path:
+
+```bash
+exelnk.exe :FIND: <path>
+
+# Example:
+exelnk.exe :FIND: "C:/prog*les/win*der/msmpeng.exe"
+# Possible output:
+# [15106] User stopped resource enumeration.
+# "\\?\C:\Program Files\Windows Defender\MsMpEng.exe"
+```
+
 Use `:RAW:` to disable argument parsing (useful with [CMD][cmd]):
 
 ```bash
@@ -51,7 +63,7 @@ You can use the following path [wildcards][nie]:
 <details>
 <summary><h3>How it works</h4></summary>
 
-Performs a recursive depth-first search to resolve wildcard patterns in the path.
+Performs a recursive [depth-first search][dfs] to resolve wildcard patterns in the path.
 
 At each path segment, it enumerates matching directories or files:
 - Substitutes the current segment with the candidate name, and recurses into the next level.
@@ -91,6 +103,7 @@ Select the **Release** configuration, right click the `exelnk` project and **Bui
 <!-- Reference Links -->
 [vs]: https://visualstudio.microsoft.com
 
+[dfs]: https://en.wikipedia.org/wiki/Depth-first_search
 [env]: https://github.com/flipeador/environment-variables-editor
 [fff]: https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw
 [isl]: https://learn.microsoft.com/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinkw

@@ -20,6 +20,9 @@
 
 #include <format>
 #include <vector>
+#include <array>
+#include <ranges>
+#include <regex>
 #include <string>
 #include <string_view>
 #include <iostream>

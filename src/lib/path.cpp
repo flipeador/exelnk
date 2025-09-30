@@ -9,13 +9,22 @@
         flags                             \
     )
 
-#define GET_CURRENT_DIRECTORY_PATH(flags)              \
+#define GET_CURRENT_DIRECTORY_PATH(flags) \
     CREATE_PATH_ABSOLUTE(GetCurrentDirectory(), flags)
 
-static size_t ClampIndex(int64_t i, size_t size)
+#define CURRENT_DIRECTORY_FULL_PATH GET_CURRENT_DIRECTORY_PATH(0)
+#define CURRENT_DIRECTORY_ROOT_PATH GET_CURRENT_DIRECTORY_PATH(PATH_FLAG_IGNORE_SEGMENTS)
+
+static auto IsRootLocalDeviceDrive(StrView path)
 {
-    const auto n = std::min(size, (size_t)std::abs(i));
-    return i < 0 ? size - n : n;
+    static std::wregex re(L"^(\\\\|/){2}\\?(\\\\|/)[A-Z]:", std::regex_constants::icase);
+    return std::regex_search(path.begin(), path.end(), re);
+}
+
+static auto IsRootLocalDeviceUNC(StrView path)
+{
+    static std::wregex re(L"^(\\\\|/){2}\\?(\\\\|/)UNC(\\\\|/)", std::regex_constants::icase);
+    return std::regex_search(path.begin(), path.end(), re);
 }
 
 static auto Extract(StrView& path, StrView& name, bool* ews)
@@ -46,88 +55,99 @@ static auto Extract(StrView& path)
 Path::Path(StrView path, uint32_t flags)
     : m_pView(&path)
 {
-    if (IsSep(0)) // "\"
+    if (IsRootLocalDeviceDrive(path))
     {
-        if (IsSep(1)) // "\\"
+        path.remove_prefix(4);
+        goto __path_type_drive;
+    }
+    else if (IsRootLocalDeviceUNC(path))
+    {
+        path.remove_prefix(8);
+        goto __path_type_unc_absolute;
+    }
+
+    if (IsSep(0))
+    {
+        if (IsSep(1))
         {
             // Local Device.
-            if (At(2) == L'.' && IsSep(3)) // "\\.\"
+            if (At(2) == L'.' && IsSep(3))
             {
                 m_type = PATH_TYPE_DEVICE;
-                m_path = path;
+                m_root = path;
             }
             // Root Local Device.
-            else if (At(2) == L'?' && IsSep(3)) // "\\?\"
+            else if (At(2) == L'?' && IsSep(3))
             {
-                path.remove_prefix(4); // skip "\\?\"
-                if (Is(0, L'U') && Is(1, L'N') && Is(2, L'C') && (!At(3) || IsSep(3))) // "\\?\UNC"
-                {
-                    path.remove_prefix(At(3) ? 4 : 3); // skip "UNC\" or "UNC"
-                    goto __path_type_set_unc;
-                }
-                else if (!ParseDrive(flags)) // "\\?\X:"
-                {
-                    m_type = PATH_TYPE_ROOT_DEVICE;
-                    m_path = std::format(L"\\\\?\\{}", path);
-                }
+                m_type = PATH_TYPE_ROOT_DEVICE;
+                m_root = path;
             }
             // UNC Absolute.
-            else // "\\"
+            else
             {
-                path.remove_prefix(2); // skip "\\"
-                __path_type_set_unc:
+                path.remove_prefix(2);
+                __path_type_unc_absolute:
                 m_type = PATH_TYPE_UNC;
                 m_server = Extract(path);
                 m_root = Extract(path);
             }
         }
         // Rooted.
-        else if (!BITALL(flags, PATH_FLAG_IGNORE_ROOTED)) // "\"
+        else if (!BITALL(flags, PATH_FLAG_IGNORE_ROOTED))
         {
-            path.remove_prefix(1); // skip "\"
-            auto cwp = GET_CURRENT_DIRECTORY_PATH(PATH_FLAG_IGNORE_SEGMENTS);
-            if ((m_type = cwp.Type()))
-            {
-                m_server = std::move(cwp.m_server);
-                m_root = std::move(cwp.m_root);
-            }
+            path.remove_prefix(1);
+            m_type = PATH_TYPE_ROOTED;
         }
     }
-    // Drive Absolute/Relative | Relative.
-    else if (!ParseDrive(flags) && At(0)) // "X:" | "X:." | "."
+    else if (At(0))
     {
-        if (!BITALL(flags, PATH_FLAG_IGNORE_RELATIVE))
+        if (At(1) == L':')
         {
-            auto cwp = GET_CURRENT_DIRECTORY_PATH(0);
-            if ((m_type = cwp.Type()))
+            __path_type_drive:
+            m_root = std::format(L"{:c}:", towupper(At(0)));
+            // Drive Absolute.
+            if (!At(2) || IsSep(2))
             {
-                m_server = std::move(cwp.m_server);
-                m_root = std::move(cwp.m_root);
-                m_segments = std::move(cwp.m_segments);
+                path.remove_prefix(At(2) ? 3 : 2);
+                m_type = PATH_TYPE_DRIVE_ABSOLUTE;
+            }
+            // Drive Relative.
+            else if (!BITALL(flags, PATH_FLAG_IGNORE_DRIVE_RELATIVE))
+            {
+                path.remove_prefix(2);
+                m_type = PATH_TYPE_DRIVE_RELATIVE;
             }
         }
+        // Relative.
+        else if (!BITALL(flags, PATH_FLAG_IGNORE_RELATIVE))
+            m_type = PATH_TYPE_RELATIVE;
     }
 
-    if (m_type == PATH_TYPE_UNC || m_type == PATH_TYPE_DRIVE)
+    // Parse the path segments.
+    if (!IsDevice() && !BITALL(flags, PATH_FLAG_IGNORE_SEGMENTS))
     {
-        if (!BITALL(flags, PATH_FLAG_IGNORE_SEGMENTS))
+        StrView part;
+        while (Extract(path, part, &m_endsWithSep))
         {
-            StrView part;
-            while (Extract(path, part, &m_endsWithSep))
+            if (part == L"..")
             {
-                if (part == L"..")
-                {
-                    if (!m_segments.empty())
-                        m_segments.pop_back();
-                }
-                else if (!part.empty() && part != L".")
+                // Process non-consecutive `..`.
+                if (!m_segments.empty() && m_segments.back() != L"..")
+                    m_segments.pop_back();
+                // Keep `..` if the path is relative.
+                // They are processed in `MakeAbsolute`.
+                else if (IsRelative())
                     m_segments.emplace_back(part);
             }
+            else if (!part.empty() && part != L".")
+                m_segments.emplace_back(part);
         }
     }
+}
 
-    if (BITALL(flags, PATH_FLAG_UPDATE_DRIVE_RELATIVE) && Type() == PATH_TYPE_DRIVE)
-        SetEnvironmentVariable(std::format(L"={}:", m_root[0]), ToString());
+uint8_t Path::Type() const
+{
+    return m_type;
 }
 
 StrView Path::Name() const
@@ -137,20 +157,44 @@ StrView Path::Name() const
     return m_segments.back();
 }
 
-uint8_t Path::Type() const
+String Path::ToString(int64_t nseg) const
 {
-    if (m_type == PATH_TYPE_UNC || m_type == PATH_TYPE_DRIVE)
+    if (m_type == PATH_TYPE_DEVICE || m_type == PATH_TYPE_ROOT_DEVICE)
+        return m_root;
+
+    String path;
+    const auto count = ClampIndex(nseg, m_segments.size());
+
+    if (IsAbsolute())
     {
-        if (m_root.empty()) return 0;
-        if (m_type == PATH_TYPE_UNC && m_server.empty()) return 0;
-        if (m_type == PATH_TYPE_DRIVE && !IsDriveLetter(m_root[0])) return 0;
+        if (m_type == PATH_TYPE_DRIVE_ABSOLUTE)
+            path = std::format(L"\\\\?\\{}", m_root);
+        else if (m_type == PATH_TYPE_UNC)
+            path = std::format(L"\\\\?\\UNC\\{}\\{}", m_server, m_root);
     }
-    const auto size = ToString().size();
-    return size && size < PATH_MAX ? m_type : 0;
+    else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
+        path.assign(m_root);
+    else if (m_type == PATH_TYPE_ROOTED)
+        path.push_back(L'\\');
+    else if (m_type == PATH_TYPE_RELATIVE)
+        path.push_back(L'.');
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (i || m_type != PATH_TYPE_DRIVE_RELATIVE)
+            path.push_back(L'\\');
+        path.append(m_segments[i]);
+    }
+
+    if (!count || (nseg == INT64_MAX && m_endsWithSep))
+        path.push_back(L'\\');
+
+    return path;
 }
 
 DWORD Path::Resolve(size_t i)
 {
+    if (!i) MakeAbsolute();
     DWORD error = NO_ERROR;
     if (i < m_segments.size())
     {
@@ -168,54 +212,108 @@ DWORD Path::Resolve(size_t i)
     return error;
 }
 
-StrView Path::ToString(int64_t nseg) const
+void Path::MakeAbsolute()
 {
-    if (m_type == PATH_TYPE_UNC || m_type == PATH_TYPE_DRIVE)
+    if (m_type == PATH_TYPE_ROOTED)
     {
-        if (m_type == PATH_TYPE_DRIVE)
-            m_path = L"\\\\?\\" + m_root;
-        else
-            m_path = std::format(L"\\\\?\\UNC\\{}\\{}", m_server, m_root);
-
-        const auto count = ClampIndex(nseg, m_segments.size());
-
-        if (!count || m_segments.empty())
-            m_path.push_back(L'\\');
+        auto path = CURRENT_DIRECTORY_ROOT_PATH;
+        MoveFrom(path, false);
+    }
+    else if (m_type == PATH_TYPE_RELATIVE)
+    {
+        auto path = CURRENT_DIRECTORY_FULL_PATH;
+        MoveFrom(path, true);
+    }
+    else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
+    {
+        // If the drive letter matches the current working directory drive letter, use that directory.
+        auto path = CURRENT_DIRECTORY_FULL_PATH;
+        if (path.m_type == PATH_TYPE_DRIVE_ABSOLUTE && path.m_root == m_root)
+            MoveFrom(path, true);
         else
         {
-            for (size_t i = 0; i < count; ++i)
-                m_path += L"\\" + m_segments[i];
-            if (count == INT64_MAX && m_endsWithSep)
-                m_path.push_back(L'\\');
+            const auto name = std::format(L"={}:", m_root[0]);
+            // If the environment variable "=X:" exists, use its value.
+            path = CREATE_PATH_ABSOLUTE(GetEnvironmentVariable(name), 0);
+            if (path.m_type == PATH_TYPE_DRIVE_ABSOLUTE)
+                MoveFrom(path, true);
+            // If all else fails, use the drive letter and update the environment variable.
+            else
+            {
+                m_type = PATH_TYPE_DRIVE_ABSOLUTE;
+                SetEnvironmentVariable(name, ToString());
+            }
         }
     }
 
-    return m_path;
+    // Process ".." in the path segments.
+    size_t size = 0;
+    for (size_t i = 0; i < m_segments.size(); ++i)
+    {
+        if (m_segments[i] == L"..")
+        {
+            if (size > 0)
+                --size;
+        }
+        else
+            m_segments[size++] = std::move(m_segments[i]);
+    }
+    m_segments.resize(size);
+}
+
+bool Path::IsDevice() const
+{
+    return m_type == PATH_TYPE_DEVICE || m_type == PATH_TYPE_ROOT_DEVICE;
+}
+
+bool Path::IsAbsolute() const
+{
+    return m_type == PATH_TYPE_DRIVE_ABSOLUTE || m_type == PATH_TYPE_UNC;
+}
+
+bool Path::IsRelative() const
+{
+    return m_type == PATH_TYPE_ROOTED || m_type == PATH_TYPE_RELATIVE || m_type == PATH_TYPE_DRIVE_RELATIVE;
+}
+
+bool Path::operator==(const Path& rhs) const
+{
+    return
+        m_type == rhs.m_type &&
+        m_root == rhs.m_root &&
+        StrEqual(m_server, rhs.m_server, true) &&
+        std::ranges::equal(m_segments, rhs.m_segments,
+            [](const String& s1, const String& s2) -> bool {
+                return StrEqual(s1, s2, true);
+            }
+        );
+}
+
+Path& Path::operator/=(const Path& rhs)
+{
+    m_endsWithSep = rhs.m_endsWithSep;
+    m_segments.append_range(rhs.m_segments);
+    return *this;
 }
 
 Path::operator PCWSTR() const
 {
-    return Type() ? ToString().data() : nullptr;
+    const auto path = operator StrView();
+    return path.empty() ? nullptr : path.data();
 }
 
 Path::operator StrView() const
 {
-    return Type() ? ToString() : L"";
-}
-
-bool Path::IsDriveLetter(wchar_t c)
-{
-    return (c >= 65 && c <= 90) || (c >= 97 && c <= 122); // A-Z || a-z
+    m_path.reserve(PATH_MAX - 1);
+    const auto path = ToString();
+    if (path.size() < PATH_MAX)
+        return m_path.assign(path);
+    return L"";
 }
 
 wchar_t Path::At(size_t index) const
 {
     return m_pView->data()[index];
-}
-
-bool Path::Is(size_t index, wchar_t c) const
-{
-    return towupper(At(index)) == c;
 }
 
 bool Path::IsSep(size_t index) const
@@ -224,52 +322,19 @@ bool Path::IsSep(size_t index) const
     return c == L'\\' || c == L'/';
 }
 
-bool Path::ParseDrive(uint32_t& flags)
+void Path::MoveFrom(Path& path, bool moveSegments)
 {
-    if (At(0) && At(1) == L':') // "X:"
-    {
-        const wchar_t letter = towupper(At(0));
+    if (!path.IsAbsolute())
+        throw std::runtime_error("");
 
-        // Drive Absolute.
-        if (!At(2) || IsSep(2)) // "X:" or "X:\"
-        {
-            m_type = PATH_TYPE_DRIVE;
-            m_root = std::format(L"{}:", letter); // "X:"
-            m_pView->remove_prefix(At(2) ? 3 : 2); // skip "X:\" or "X:"
-        }
-        // Drive Relative.
-        else if (!BITALL(flags, PATH_FLAG_IGNORE_DRIVE_RELATIVE)) // "X:."
-        {
-            m_type = PATH_TYPE_DRIVE;
-            // If the drive letter matches the current working directory drive letter, use that directory.
-            auto cwp = GET_CURRENT_DIRECTORY_PATH(0);
-            if (cwp.Type() == PATH_TYPE_DRIVE && cwp.m_root[0] == letter)
-            {
-                m_root = std::move(cwp.m_root);
-                m_segments = std::move(cwp.m_segments);
-            }
-            else
-            {
-                // If the environment variable "=X:" exists, use its value.
-                const auto name = std::format(L"={}:", letter); // "=X:"
-                auto path = CREATE_PATH_ABSOLUTE(GetEnvironmentVariable(name), 0);
-                if (path.Type() == PATH_TYPE_DRIVE)
-                {
-                    m_root = std::move(path.m_root);
-                    m_segments = std::move(path.m_segments);
-                }
-                // If all else fails, use the drive letter and update the environment variable.
-                else
-                {
-                    m_root.push_back(letter); // drive letter
-                    m_root.push_back(L':');
-                    // Signal to update later, after the segments are processed.
-                    flags |= PATH_FLAG_UPDATE_DRIVE_RELATIVE;
-                }
-            }
-            m_pView->remove_prefix(2); // skip "X:"
-        }
-        return true;
+    m_type = path.m_type;
+    m_server = std::move(path.m_server);
+    m_root = std::move(path.m_root);
+
+    if (moveSegments)
+    {
+        for (auto& segment : m_segments)
+            path.m_segments.push_back(std::move(segment));
+        m_segments = std::move(path.m_segments);
     }
-    return false;
 }

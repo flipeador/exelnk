@@ -5,7 +5,9 @@
 
 #define BITALL(value, bits) (((value) & (bits)) == (bits))
 
+size_t ClampIndex(int64_t i, size_t size);
 Optional<int64_t> StrToInt(StrView str, INT base = 10);
+bool StrEqual(StrView s1, StrView s2, bool icase = false);
 String SystemErrorToString(DWORD error);
 String GetModulePath(HMODULE hModule);
 String GetCurrentDirectory();

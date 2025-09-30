@@ -2,7 +2,7 @@
 
 constexpr uint32_t EXELNK_FLAG_RAW = 1 << 0;
 
-#define READ_ADS_STR(_) ReadAds(path, _).value_or(L"")
+#define READ_ADS_STR(_) ReadAds(modulePath, _).value_or(L"")
 #define READ_ADS_INT(_1, _2) StrToInt(READ_ADS_STR(_1)).value_or(_2)
 
 #define CHECK_ERROR(e)                           \
@@ -34,24 +34,45 @@ INT wmain(INT argc, PWSTR argv[])
     //if (isFinalProcess)
     //    ShowWindow(GetConsoleWindow(), SW_HIDE);
 
-    std::vector<String> args;
+    Vector<StrView> args;
     for (INT i = 1; i < argc; ++i)
         args.push_back(argv[i]);
 
-    auto path = Path(GetModulePath(nullptr));
+    const auto modulePath = Path(GetModulePath(nullptr));
+    const auto moduleName = modulePath.Name();
 
-    // Write alternate data stream (ADS).
-    if (args.size() && args[0] == L":SET:")
+    if (args.size() >= 1)
     {
-        if (args.size() >= 3)
+        // Write alternate data stream (ADS).
+        if (args[0] == L":SET:")
         {
-            CHECK_ERROR(WriteAds(path, args[1], args[2]));
+            if (args.size() >= 3)
+            {
+                const auto result = WriteAds(modulePath, args[1], args[2]);
+                const auto error = result ? NO_ERROR : GetLastError();
+                PRINT(L"[{}] {}", error, SystemErrorToString(error));
+            }
+            else
+            {
+                PRINT(L"Usage:\n\t{} :SET: <name> <value>", moduleName);
+            }
+            return NO_ERROR;
         }
-        else
+        // Resolve path.
+        if (args[0] == L":FIND:")
         {
-            PRINT(L"Usage:\n\texelnk.exe :SET: <name> <value>");
+            if (args.size() >= 2)
+            {
+                Path path(args[1]);
+                const auto error = path.Resolve();
+                PRINT(L"[{}] {}\n\"{}\"", error, SystemErrorToString(error), (StrView)path);
+            }
+            else
+            {
+                PRINT(L"Usage:\n\t{} :FIND: <path>", moduleName);
+            }
+            return NO_ERROR;
         }
-        return NO_ERROR;
     }
 
     auto file = Path(READ_ADS_STR(L"file"));
@@ -68,7 +89,7 @@ INT wmain(INT argc, PWSTR argv[])
     if (!file.Type())
     {
         PRINT(L"INFO: file not set or invalid, run:");
-        PRINT(L"\t{} :SET: file <path>", path.Name());
+        PRINT(L"\t{} :SET: file <path>", moduleName);
         return NO_ERROR;
     }
 
@@ -77,7 +98,8 @@ INT wmain(INT argc, PWSTR argv[])
     file.Resolve();
     wdir.Resolve();
 
-    String cmdl; // command line
+    // Build command line.
+    String cmdl;
     AppendArgument(cmdl, file.Name());
     AppendArgument(cmdl, READ_ADS_STR(L"args"), TRUE);
     for (const auto& arg : args)
