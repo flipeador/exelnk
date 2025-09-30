@@ -1,7 +1,9 @@
 <Solution>
   <Configurations>
+    <Platform Name="AMD64" />
     <Platform Name="ARM64" />
-    <Platform Name="x64" />
   </Configurations>
-  <Project Path="exelnk.vcxproj" Id="63968529-a4c4-468d-bfcb-2b92dea2a478" />
+  <Project Path="exelnk.vcxproj" Id="63968529-a4c4-468d-bfcb-2b92dea2a478">
+    <Platform Solution="*|AMD64" Project="x64" />
+  </Project>
 </Solution>
