@@ -33,7 +33,13 @@ Execute the target file:
 exelnk.exe [...args]
 ```
 
-Use `:FIND:` to resolve a path:
+Use `:RAW:` to disable argument parsing (useful with [CMD][cmd]):
+
+```bash
+exelnk.exe :RAW: [...args]
+```
+
+Use `:FIND:` to resolve a path (for testing purposes):
 
 ```bash
 exelnk.exe :FIND: <path>
@@ -45,17 +51,11 @@ exelnk.exe :FIND: "C:/prog*les/win*der/msmpeng.exe"
 # "\\?\C:\Program Files\Windows Defender\MsMpEng.exe"
 ```
 
-Use `:RAW:` to disable argument parsing (useful with [CMD][cmd]):
-
-```bash
-exelnk.exe :RAW: [...args]
-```
-
 ## Wildcard Patterns
 
-You can use the following path [wildcards][nie]:
+You can use the following [wildcard characters][wil]:
 
-| Character | Description |
+| Wildcard | Description |
 | :---: | --- |
 | `?` | Matches a single character. |
 | `*` | Matches zero or more characters. |
@@ -65,9 +65,9 @@ You can use the following path [wildcards][nie]:
 
 Performs a recursive [depth-first search][dfs] to resolve wildcard patterns in the path.
 
-At each path segment, it enumerates matching directories or files:
-- Substitutes the current segment with the candidate name, and recurses into the next level.
-- If the target path does not exist at some depth, the function backtracks and continues with the next candidate from the previous level.
+At each path segment, it [enumerates][fff] matching directories or files:
+- Substitutes the current path segment with the candidate name, and recurses into the next level if the item is a directory.
+- If the target path does not exist at some depth, backtracks and continues with the next candidate from the previous level.
 - The search terminates as soon as a full valid path is found, or exhausts all options if none exists.
 
 For example, given the pattern `C:\XYZ_*\File.txt` and the following file structure:
@@ -107,7 +107,7 @@ Select the **Release** configuration, right click the `exelnk` project and **Bui
 [env]: https://github.com/flipeador/environment-variables-editor
 [fff]: https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw
 [isl]: https://learn.microsoft.com/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinkw
-[nie]: https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/nf-ntifs-_fsrtl_advanced_fcb_header-fsrtlisnameinexpression
+[wil]: https://web.archive.org/web/20230406111635/https://learn.microsoft.com/en-us/archive/blogs/jeremykuhne/wildcards-in-windows
 [cmd]: https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way#:~:text=cmd.exe
 
 [downl]: https://github.com/flipeador/exelnk/archive/refs/heads/main.zip

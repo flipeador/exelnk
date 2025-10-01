@@ -210,10 +210,10 @@ DWORD Path::Resolve(size_t i)
                     return NO_ERROR;
                 // Continue the depth-first search at the next segment.
                 DWORD error = Resolve(i + 1);
-                // Continue enumeration if no matching files have been found.
+                // Continue enumeration if no matching items have been found.
                 if (error == ERROR_FILE_NOT_FOUND || error == ERROR_NO_MORE_FILES)
                     return NO_ERROR;
-                // Stop enumeration if an error has occurred.
+                // Stop enumeration if an error has occurred or an item has been found.
                 return error;
             }
         );
