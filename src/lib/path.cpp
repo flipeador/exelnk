@@ -159,8 +159,8 @@ StrView Path::Name() const
 
 String Path::ToString(int64_t nseg) const
 {
-    if (m_type == PATH_TYPE_DEVICE || m_type == PATH_TYPE_ROOT_DEVICE)
-        return m_root;
+    if (!m_type) return L"";
+    if (IsDevice()) return m_root;
 
     String path;
     const auto count = ClampIndex(nseg, m_segments.size());
