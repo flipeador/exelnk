@@ -1,20 +1,19 @@
 #include "framework.hpp"
 
+typedef DWORD(__stdcall* RUNDLLFN)(INT, PWSTR[]);
+
 constexpr uint32_t EXELNK_FLAG_RAW = 1 << 0;
 
 #define READ_ADS_STR(_) ReadAds(modulePath, _).value_or(L"")
 #define READ_ADS_INT(_1, _2) StrToInt(READ_ADS_STR(_1)).value_or(_2)
 
-#define CHECK_ERROR(e)                           \
-    if (!(e))                                    \
-        return PrintSystemError(GetLastError());
-
-static auto PrintSystemError(DWORD error)
-{
-    if (error)
-        PRINT_ERROR(L"ERROR: {}\t{}", error, SystemErrorToString(error));
-    return error;
-}
+#define CHECK_ERROR(e)                                        \
+    if (!(e))                                                 \
+    {                                                         \
+        const auto error = GetLastError();                    \
+        PRINT(L"[{}] {}", error, SystemErrorToString(error)); \
+        return error;                                         \
+    }
 
 static auto ReadAds(StrView path, StrView name)
 {
@@ -51,11 +50,38 @@ INT wmain(INT argc, PWSTR argv[])
                 const auto result = WriteAds(modulePath, args[1], args[2]);
                 const auto error = result ? NO_ERROR : GetLastError();
                 PRINT(L"[{}] {}", error, SystemErrorToString(error));
+                return error;
             }
-            else
+            PRINT(L"Usage:\n\t{} :SET: <name> <value>", moduleName);
+            return NO_ERROR;
+        }
+        // Run DLL function.
+        if (args[0] == L":DLL:")
+        {
+            if (args.size() >= 3)
             {
-                PRINT(L"Usage:\n\t{} :SET: <name> <value>", moduleName);
+                HMODULE hModule; FARPROC fn = nullptr;
+                CHECK_ERROR(hModule = LoadLibraryW(args[1].data()));
+                // Look up by ordinal.
+                if (args[2].starts_with(L'#'))
+                {
+                    auto ord = StrToInt(args[2].data() + 1);
+                    if (ord && !IS_INTRESOURCE(*ord)) ord.reset();
+                    auto ordinal = MAKEINTRESOURCEA(ord.value_or(0));
+                    CHECK_ERROR(fn = GetProcAddress(hModule, ordinal));
+                }
+                // Look up by name.
+                else
+                {
+                    #pragma warning(suppress: 4244) // narrow cast (wchar_t → char)
+                    const auto name = std::string(args[2].begin(), args[2].end());
+                    CHECK_ERROR(fn = GetProcAddress(hModule, name.data()));
+                }
+                const auto error = RUNDLLFN(fn)(argc - 4, argv + 4);
+                PRINT(L"[{}] {}", error, SystemErrorToString(error));
+                return error;
             }
+            PRINT(L"Usage:\n\t{} :DLL: <path> <function> [...args]", moduleName);
             return NO_ERROR;
         }
         // Resolve path.
@@ -66,11 +92,9 @@ INT wmain(INT argc, PWSTR argv[])
                 Path path(args[1]);
                 const auto error = path.Resolve();
                 PRINT(L"[{}] {}\n\"{}\"", error, SystemErrorToString(error), (StrView)path);
+                return error;
             }
-            else
-            {
-                PRINT(L"Usage:\n\t{} :FIND: <path>", moduleName);
-            }
+            PRINT(L"Usage:\n\t{} :FIND: <path>", moduleName);
             return NO_ERROR;
         }
     }
@@ -95,8 +119,8 @@ INT wmain(INT argc, PWSTR argv[])
 
     // Resolve path wildcards with `FindFirstFileExW`.
     // This is done recursively for each path segment.
-    file.Resolve();
-    wdir.Resolve();
+    if (Path::IsPattern(file)) file.Resolve();
+    if (Path::IsPattern(wdir)) wdir.Resolve();
 
     // Build command line.
     String cmdl;

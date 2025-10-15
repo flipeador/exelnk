@@ -45,10 +45,20 @@ Use `:FIND:` to resolve a path (for testing purposes):
 exelnk.exe :FIND: <path>
 
 # Example:
-exelnk.exe :FIND: "C:/prog*les/win*der/msmpeng.exe"
+exelnk.exe :FIND: "C:/pro*les/win*der/msmpeng.e?e"
 # Possible output:
 # [15106] User stopped resource enumeration.
 # "\\?\C:\Program Files\Windows Defender\MsMpEng.exe"
+```
+
+Use `:DLL:` to call functions from a DLL (similar to [`rundll32`][rdl]):
+
+```bash
+exelnk.exe :DLL: <path> <function> [...args]
+```
+
+```cpp
+int function(int argc, wchar_t* argv[]);
 ```
 
 ## Wildcard Patterns
@@ -109,6 +119,7 @@ Select the **Release** configuration, right click the `exelnk` project and **Bui
 [isl]: https://learn.microsoft.com/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinkw
 [wil]: https://web.archive.org/web/20230406111635/https://learn.microsoft.com/en-us/archive/blogs/jeremykuhne/wildcards-in-windows
 [cmd]: https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way#:~:text=cmd.exe
+[rdl]: https://learn.microsoft.com/windows-server/administration/windows-commands/rundll32
 
 [downl]: https://github.com/flipeador/exelnk/archive/refs/heads/main.zip
 [clone]: https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository

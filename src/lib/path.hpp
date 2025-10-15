@@ -29,7 +29,7 @@ public:
 
     uint8_t Type() const;
     StrView Name() const;
-    String ToString(int64_t nseg = INT64_MAX) const;
+    StrView ToString(int64_t nseg = INT64_MAX, String* stream = nullptr) const;
     DWORD Resolve(size_t i = 0);
     void MakeAbsolute();
 
@@ -42,6 +42,8 @@ public:
 
     operator PCWSTR() const;
     operator StrView() const;
+
+    static bool IsPattern(StrView path);
 private:
     wchar_t At(size_t) const;
     bool IsSep(size_t) const;
@@ -52,7 +54,7 @@ private:
 
     bool m_endsWithSep = false; // Whether the path ends with a separator.
     uint8_t m_type = 0;         // path type
-    String m_server;            // UNC server address (domain name or IP address)
+    String m_server;            // UNC server (domain name or IP address)
     String m_root;              // UNC share name | drive letter
-    Vector<String> m_segments;  // resource elements
+    Vector<String> m_segments;  // components / elements / directories / filename
 };

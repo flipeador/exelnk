@@ -60,32 +60,6 @@ String GetCurrentDirectory()
     return path;
 }
 
-DWORD EnumerateFiles(StrView path, const Function<DWORD(WIN32_FIND_DATA*)>& fn)
-{
-    WIN32_FIND_DATA data;
-    auto hFindFile = FindFirstFileExW(path.data(), FindExInfoBasic, &data, FindExSearchNameMatch, nullptr, 0);
-    if (hFindFile == INVALID_HANDLE_VALUE)
-        return GetLastError();
-    DWORD error = NO_ERROR;
-    for (;;)
-    {
-        StrView name(data.cFileName);
-        if (name != L"." && name != L"..")
-        {
-            error = fn(&data);
-            if (error != NO_ERROR)
-                break;
-        }
-        if (!FindNextFileW(hFindFile, &data))
-        {
-            error = GetLastError();
-            break;
-        }
-    }
-    FindClose(hFindFile);
-    return error;
-}
-
 String GetEnvironmentVariable(StrView name)
 {
     String value;
@@ -140,4 +114,52 @@ String& AppendArgument(String& str, StrView arg, BOOL raw)
     str.push_back(L'"');
 
     return str;
+}
+
+DWORD EnumerateFiles(StrView path, const Function<DWORD(WIN32_FIND_DATA*)>& fn)
+{
+    WIN32_FIND_DATA data;
+    auto hFindFile = FindFirstFileExW(path.data(), FindExInfoBasic, &data, FindExSearchNameMatch, nullptr, 0);
+    if (hFindFile == INVALID_HANDLE_VALUE)
+        return GetLastError();
+    DWORD error = NO_ERROR;
+    for (;;)
+    {
+        StrView name(data.cFileName);
+        if (name != L"." && name != L"..")
+        {
+            error = fn(&data);
+            if (error != NO_ERROR)
+                break;
+        }
+        if (!FindNextFileW(hFindFile, &data))
+        {
+            error = GetLastError();
+            break;
+        }
+    }
+    FindClose(hFindFile);
+    return error;
+}
+
+DWORD EnumerateStreams(StrView path, const Function<DWORD(WIN32_FIND_STREAM_DATA*)>& fn)
+{
+    WIN32_FIND_STREAM_DATA data;
+    auto hFindStream = FindFirstStreamW(path.data(), FindStreamInfoStandard, &data, 0);
+    if (hFindStream == INVALID_HANDLE_VALUE)
+        return GetLastError();
+    DWORD error = NO_ERROR;
+    for (;;)
+    {
+        error = fn(&data);
+        if (error != NO_ERROR)
+            break;
+        if (!FindNextStreamW(hFindStream, &data))
+        {
+            error = GetLastError();
+            break;
+        }
+    }
+    FindClose(hFindStream);
+    return error;
 }

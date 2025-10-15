@@ -157,39 +157,48 @@ StrView Path::Name() const
     return m_segments.back();
 }
 
-String Path::ToString(int64_t nseg) const
+StrView Path::ToString(int64_t nseg, String* stream) const
 {
     if (!m_type) return L"";
     if (IsDevice()) return m_root;
 
-    String path;
     const auto count = ClampIndex(nseg, m_segments.size());
 
-    if (IsAbsolute())
-    {
-        if (m_type == PATH_TYPE_DRIVE_ABSOLUTE)
-            path = std::format(L"\\\\?\\{}", m_root);
-        else if (m_type == PATH_TYPE_UNC)
-            path = std::format(L"\\\\?\\UNC\\{}\\{}", m_server, m_root);
-    }
-    else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
-        path.assign(m_root);
-    else if (m_type == PATH_TYPE_ROOTED)
-        path.push_back(L'\\');
+    if (m_type == PATH_TYPE_ROOTED)
+        m_path = L"\\";
     else if (m_type == PATH_TYPE_RELATIVE)
-        path.push_back(L'.');
+        m_path = L":";
+    else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
+        m_path = m_root;
+    else if (m_type == PATH_TYPE_DRIVE_ABSOLUTE)
+        m_path = std::format(L"\\\\?\\{}", m_root);
+    else if (m_type == PATH_TYPE_UNC)
+        m_path = std::format(L"\\\\?\\UNC\\{}\\{}", m_server, m_root);
+
+    if (stream)
+        stream->clear();
 
     for (size_t i = 0; i < count; ++i)
     {
         if (i || m_type != PATH_TYPE_DRIVE_RELATIVE)
-            path.push_back(L'\\');
-        path.append(m_segments[i]);
+            m_path.push_back(L'\\');
+        StrView segment = m_segments[i];
+        if (stream && i == count - 1)
+        {
+            const auto index = segment.find_first_of(L':');
+            if (index && index != segment.npos)
+            {
+                *stream = segment.substr(index);
+                segment = segment.substr(0, index);
+            }
+        }
+        m_path.append(segment);
     }
 
     if (!count || (nseg == INT64_MAX && m_endsWithSep))
-        path.push_back(L'\\');
+        m_path.push_back(L'\\');
 
-    return path;
+    return m_path;
 }
 
 DWORD Path::Resolve(size_t i)
@@ -198,18 +207,62 @@ DWORD Path::Resolve(size_t i)
     DWORD error = NO_ERROR;
     if (i < m_segments.size())
     {
-        error = EnumerateFiles(
-            ToString(i + 1),
+        String stream;
+        const auto currentPath = ToString(i + 1, &stream);
+        const auto isLastSegment = i == m_segments.size() - 1;
+        // The data stream must be specified at the end of the path.
+        if (!stream.empty() && (!isLastSegment || m_endsWithSep))
+            return ERROR_INVALID_NAME;
+        // Start enumerating files and directories.
+        error = EnumerateFiles(currentPath,
             [&](WIN32_FIND_DATA* pfd) -> DWORD {
                 m_segments[i] = pfd->cFileName;
+                const auto isDirectory = BITALL(pfd->dwFileAttributes, FILE_ATTRIBUTE_DIRECTORY);
                 // Stop enumeration if there are no more segments.
-                if (i == m_segments.size() - 1)
-                    return ERROR_RESOURCE_ENUM_USER_STOP;
+                if (isLastSegment)
+                {
+                    // If the path ends with a separator, the last item must be a directory.
+                    if (m_endsWithSep && !isDirectory)
+                        return ERROR_DIRECTORY;
+                    // If the path does not specify a data stream.
+                    if (stream.empty())
+                        return ERROR_RESOURCE_ENUM_USER_STOP;
+                    // Directories cannot have a default data stream.
+                    if (isDirectory && (stream == L":" || stream[1] == L':'))
+                        error = ERROR_DIRECTORY_NOT_SUPPORTED;
+                    else
+                    {
+                        String streamName = stream;
+                        if (streamName.find_first_of(L':', 1) == String::npos)
+                            streamName += L":$DATA";
+                        // Start enumerating file/directory data streams.
+                        error = EnumerateStreams(ToString(),
+                            [&](WIN32_FIND_STREAM_DATA* pfd) -> DWORD {
+                                if (StrEqual(pfd->cStreamName, streamName, true))
+                                {
+                                    // Only add the data stream if it is not the default.
+                                    if (pfd->cStreamName[1] != L':')
+                                    {
+                                        // Add the data stream without the ":$DATA" suffix.
+                                        *std::wcsrchr(pfd->cStreamName, L':') = L'\0';
+                                        m_segments[i] += pfd->cStreamName;
+                                    }
+                                    return ERROR_RESOURCE_ENUM_USER_STOP;
+                                }
+                                return NO_ERROR;
+                            }
+                        );
+                    }
+                    // If there was an error, keep the data stream unchanged.
+                    if (error != ERROR_RESOURCE_ENUM_USER_STOP)
+                        m_segments[i] += stream;
+                    return error;
+                }
                 // Continue enumeration if the current item is not a directory.
-                if (!BITALL(pfd->dwFileAttributes, FILE_ATTRIBUTE_DIRECTORY))
+                if (!isDirectory)
                     return NO_ERROR;
                 // Continue the depth-first search at the next segment.
-                DWORD error = Resolve(i + 1);
+                error = Resolve(i + 1);
                 // Continue enumeration if no matching items have been found.
                 if (error == ERROR_FILE_NOT_FOUND || error == ERROR_NO_MORE_FILES)
                     return NO_ERROR;
@@ -235,7 +288,7 @@ void Path::MakeAbsolute()
     }
     else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
     {
-        // If the drive letter matches the current working directory drive letter, use that directory.
+        // If the drive letter matches the current directory drive letter, use that directory.
         auto path = CURRENT_DIRECTORY_FULL_PATH;
         if (path.m_type == PATH_TYPE_DRIVE_ABSOLUTE && path.m_root == m_root)
             MoveFrom(path, true);
@@ -250,7 +303,7 @@ void Path::MakeAbsolute()
             else
             {
                 m_type = PATH_TYPE_DRIVE_ABSOLUTE;
-                SetEnvironmentVariable(name, ToString());
+                SetEnvironmentVariable(name, m_root + L"\\");
             }
         }
     }
@@ -313,11 +366,13 @@ Path::operator PCWSTR() const
 
 Path::operator StrView() const
 {
-    m_path.reserve(PATH_MAX - 1);
     const auto path = ToString();
-    if (path.size() < PATH_MAX)
-        return m_path.assign(path);
-    return L"";
+    return path.size() < PATH_MAX ? path : L"";
+}
+
+bool Path::IsPattern(StrView path)
+{
+    return path.find_first_of(L"*?<>\"") != path.npos;
 }
 
 wchar_t Path::At(size_t index) const
