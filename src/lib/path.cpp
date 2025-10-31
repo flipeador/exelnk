@@ -167,7 +167,7 @@ StrView Path::ToString(int64_t nseg, String* stream) const
     if (m_type == PATH_TYPE_ROOTED)
         m_path = L"\\";
     else if (m_type == PATH_TYPE_RELATIVE)
-        m_path = L":";
+        m_path = L".";
     else if (m_type == PATH_TYPE_DRIVE_RELATIVE)
         m_path = m_root;
     else if (m_type == PATH_TYPE_DRIVE_ABSOLUTE)
